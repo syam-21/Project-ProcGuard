@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>🛡️ ProcGuard Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #0d1117;
+      --card-bg: rgba(22, 27, 34, 0.85);
+      --border-color: #30363d;
+      --text-main: #e6edf3;
+      --text-sub: #8b949e;
+      --accent-blue: #58a6ff;
+      --accent-green: #3fb950;
+      --accent-red: #f85149;
+      --accent-yellow: #d29922;
+      --accent-teal: #39d0d0;
+      --card-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      --glow-blue: 0 0 20px rgba(88, 166, 255, 0.25);
+    }
+
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      background: var(--bg-color); 
+      color: var(--text-main); 
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; 
+      font-size:15px; 
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Animations */
+    @keyframes pulse-glow {
+      0% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-blue)); }
+      50% { transform: scale(1.15); filter: drop-shadow(0 0 12px var(--accent-blue)); }
+      100% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-blue)); }
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    @keyframes float {
+      0% { transform: translateY(0) rotate(0deg); }
+      33% { transform: translateY(-8px) rotate(3deg); }
+      66% { transform: translateY(-4px) rotate(-3deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+    @keyframes rotate-sync {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes bounce-subtle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .animated-icon { display: inline-block; animation: float 4s ease-in-out infinite; }
+    .pulse { animation: pulse-glow 2s infinite; }
+    .shake { animation: shake 0.6s infinite; }
+    .rotate { animation: rotate-sync 12s linear infinite; }
+    .bounce { animation: bounce-subtle 2s ease-in-out infinite; }
+
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-track{background:#161b22}
+    ::-webkit-scrollbar-thumb{background:#30363d;border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:#484f58}
+
+    .topbar{background: var(--card-bg); border-bottom:1px solid var(--border-color); padding:12px 24px;
+            display:flex;align-items:center;justify-content:space-between;z-index:100;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.5); flex-shrink: 0; backdrop-filter: blur(15px); position: relative;}
+    .topbar .title-container { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; width: auto; z-index: 10; }
+    .topbar h1{font-size:24px;color: var(--accent-blue); display:flex;align-items:center;gap:15px; font-weight: 900; letter-spacing: -0.5px; white-space: nowrap;}
+    .topbar h1 span.sub{font-size:14px;color: var(--text-sub); font-weight:700; letter-spacing: 2.5px; display: block; margin-top: 2px;}
+    .topbar-right{display:flex;align-items:center;gap:20px;font-size:15px;color: var(--text-sub); margin-left: auto; z-index: 5;}
+    
+    .badge{padding:6px 16px;border-radius:25px;font-size:12px;font-weight:900; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);}
+    .badge.green{background:rgba(63, 185, 80, 0.25);color:#3fb950; border: 1px solid rgba(63, 185, 80, 0.5);}
+    .badge.red{background:rgba(248, 81, 73, 0.25);color:#f85149; border: 1px solid rgba(248, 81, 73, 0.5);}
+    .badge.yellow{background:rgba(210, 153, 34, 0.25);color:#d29922; border: 1px solid rgba(210, 153, 34, 0.5);}
+
+    #alert-banner{background:rgba(248, 81, 73, 0.2);border-bottom:2px solid var(--accent-red);
+                  color:#f85149;padding:12px 24px;font-size:16px;font-weight:900;
+                  display:flex;gap:15px;flex-wrap:wrap;align-items:center; transition: all 0.3s; flex-shrink: 0; backdrop-filter: blur(10px);}
+    #alert-banner.hidden{display:none!important}
+
+    .tabs{background: var(--card-bg); border-bottom:1px solid var(--border-color); display:flex;gap:12px;padding:0 35px; overflow-x: auto; flex-shrink: 0; backdrop-filter: blur(10px);}
+    .tab{padding:18px 28px;cursor:pointer;font-size:16px;color: var(--text-sub); border-bottom:4px solid transparent; transition:.3s; font-weight: 800; white-space: nowrap; display: flex; align-items: center; gap: 10px;}
+    .tab:hover{color: var(--text-main); background: rgba(255,255,255,0.07); transform: translateY(-2px);}
+    .tab.active{color: var(--accent-blue); border-bottom-color: var(--accent-blue); background: rgba(88, 166, 255, 0.12); border-radius: 6px 6px 0 0;}
+
+    .tab-content{display:none;padding:24px; animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1); height: 100%; overflow-y: auto; flex: 1;}
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .tab-content.active{display:flex; flex-direction: column;}
+
+    .card{background: var(--card-bg); border:1px solid var(--border-color); border-radius:20px; padding:18px; 
+          transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: var(--card-shadow); position: relative; overflow: hidden; backdrop-filter: blur(15px);}
+    .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: transparent; transition: 0.3s; }
+    .card:hover{border-color: #58a6ff; transform: translateY(-6px) scale(1.015); box-shadow: 0 20px 50px rgba(0,0,0,0.6), var(--glow-blue);}
+    .card:hover::before { background: var(--accent-blue); }
+    .card h3{font-size:12px;color: var(--text-sub); text-transform:uppercase;letter-spacing:2px;margin-bottom:15px; display: flex; align-items: center; gap: 10px; font-weight: 900;}
+    
+    .grid-3{display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:20px;margin-bottom:20px}
+    .grid-2{display:grid;grid-template-columns:repeat(auto-fit, minmax(400px, 1fr));gap:20px;margin-bottom:20px}
+    .grid-4{display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:20px;margin-bottom:20px}
+
+    .stat-val{font-size:38px;font-weight:950;margin:10px 0; display: flex; align-items: baseline; gap: 8px; letter-spacing: -1.5px;}
+    .stat-sub{font-size:13px;color: var(--text-sub); font-weight: 800;}
+    .stat-bar{height:10px;background:#21262d;border-radius:10px;margin-top:15px;overflow:hidden; border: 1px solid rgba(255,255,255,0.05); box-shadow: inset 0 3px 6px rgba(0,0,0,0.4);}
+    .stat-bar-fill{height:100%;border-radius:10px;transition:width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); position: relative; overflow: hidden;}
+    .stat-bar-fill::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent); animation: sweep 2.5s infinite; }
+    @keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    
+    .cpu-color{color: var(--accent-blue); text-shadow: 0 0 25px rgba(88, 166, 255, 0.5);}
+    .cpu-fill{background: linear-gradient(90deg, #1f6feb, #58a6ff)}
+    .ram-color{color: var(--accent-green); text-shadow: 0 0 25px rgba(63, 185, 80, 0.5);}
+    .ram-fill{background: linear-gradient(90deg, #238636, #3fb950)}
+    .disk-color{color: var(--accent-yellow); text-shadow: 0 0 25px rgba(210, 153, 34, 0.5);}
+    .disk-fill{background: linear-gradient(90deg, #9e6a03, #d29922)}
+    .warn-color{color: var(--accent-red); animation: shake 0.5s infinite; font-weight: 900;}
+
+    table{width:100%;border-collapse:separate; border-spacing: 0; font-size:14px}
+    th{background:#21262d;color: var(--text-sub);padding:14px 18px;text-align:left;
+       font-size:12px;text-transform:uppercase;letter-spacing:1.5px;position:sticky;top:0; z-index: 10; font-weight: 950; border-bottom: 3px solid var(--border-color);}
+    td{padding:12px 18px;border-bottom:1px solid #21262d; transition: all 0.3s;}
+    tr:hover td{background:rgba(88, 166, 255, 0.1); color: #fff; transform: scale(1.005);}
+    
+    .status-pill{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:900; text-transform: uppercase; box-shadow: 0 3px 8px rgba(0,0,0,0.3);}
+    .s-running{background:rgba(63, 185, 80, 0.3);color:#3fb950; border: 1px solid rgba(63, 185, 80, 0.6);}
+    .s-sleeping{background:rgba(210, 153, 34, 0.3);color:#d29922; border: 1px solid rgba(210, 153, 34, 0.6);}
+    .s-zombie{background:rgba(248, 81, 73, 0.3);color:#f85149; border: 1px solid rgba(248, 81, 73, 0.6);}
+    
+    .btn-kill{background:rgba(248, 81, 73, 0.2);color:#f85149;border:1px solid #f85149;
+              padding:8px 16px;border-radius:10px;cursor:pointer;font-size:13px;transition:.3s; font-weight: 900;}
+    .btn-kill:hover{background:#f85149;color:#fff; transform: scale(1.08) rotate(-3deg); box-shadow: 0 8px 20px rgba(248, 81, 73, 0.6);}
+    .protected-badge{background:#1c2128;color: var(--text-sub);padding:5px 12px;border-radius:8px;font-size:12px; border: 1px solid var(--border-color); font-weight: 800;}
+
+    .log-box{background: #010409; border:1px solid var(--border-color); border-radius:15px;
+             padding:18px;height:400px;overflow-y:auto;font-family:'JetBrains Mono', monospace;font-size:13px;line-height:1.6; box-shadow: inset 0 8px 20px rgba(0,0,0,0.7);}
+    .log-INFO{color: #8b949e}
+    .log-WARN{color: var(--accent-yellow); background: rgba(210, 153, 34, 0.08); border-radius: 4px; padding: 2px 6px;}
+    .log-ERROR{color: var(--accent-red); background: rgba(248, 81, 73, 0.12); font-weight: bold; border-left: 4px solid var(--accent-red); padding: 4px 12px; margin: 4px 0;}
+    
+    .log-controls{display:flex;gap:12px;margin-bottom:15px;align-items:center;flex-wrap:wrap}
+    select,input[type=number]{background:#21262d;border:1px solid var(--border-color);color: var(--text-main);
+                                padding:8px 14px;border-radius:8px;font-size:13px; outline: none; transition: 0.3s; font-weight: 600;}
+    select:focus, input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.2); }
+
+    .btn{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-size:14px;font-weight:900;transition:.3s; display: inline-flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 1px;}
+    .btn:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .btn-blue{background: linear-gradient(135deg, #1f6feb, #388bfd); color:#fff; box-shadow: 0 8px 20px rgba(31, 111, 235, 0.4);}
+    .btn-green{background:rgba(63, 185, 80, 0.15);color:#3fb950;border:1px solid #3fb950}.btn-green:hover{background:#3fb950;color:#fff}
+    .btn-orange{background:rgba(210, 153, 34, 0.15);color:#d29922;border:1px solid #d29922}.btn-orange:hover{background:#d29922;color:#000}
+    .btn-red{background:rgba(248, 81, 73, 0.15);color:#f85149;border:1px solid #f85149}.btn-red:hover{background:#f85149;color:#fff}
+    .btn-gray{background:#21262d;color: var(--text-sub);border:1px solid var(--border-color)}.btn-gray:hover{background:#30363d;color: var(--text-main)}
+    .btn-teal{background:rgba(57, 208, 208, 0.1);color:#39d0d0;border:1px solid #39d0d0;text-decoration:none}.btn-teal:hover{background:#39d0d0;color:#000}
+
+    /* Process section scroll and highlighting */
+    .table-container { 
+      height: 500px; 
+      overflow-y: auto; 
+      border-radius: 15px; 
+      border: 1px solid var(--border-color);
+      background: rgba(0,0,0,0.2);
+    }
+    .high-usage-row { 
+      background: rgba(248, 81, 73, 0.15) !important; 
+    }
+    .high-usage-row:hover td {
+      background: rgba(248, 81, 73, 0.25) !important;
+    }
+    .high-cpu-text {
+      color: var(--accent-red) !important;
+      font-weight: 950 !important;
+      animation: pulse 1.5s infinite;
+    }
+
+    .report-box{background: #010409; border:1px solid var(--border-color); border-radius:15px;
+                padding:18px;font-family: 'JetBrains Mono', monospace;font-size:13px;line-height:1.8;
+                white-space:pre-wrap;min-height:220px;color: var(--text-main); box-shadow: inset 0 8px 20px rgba(0,0,0,0.7);}
+
+    .crit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+    .crit-item{background: rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px;
+               padding:12px 18px;display:flex;align-items:center;gap:12px;font-size:13px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
+    .crit-item:hover { border-color: var(--accent-blue); transform: translateY(-5px) rotate(1deg); background: rgba(88, 166, 255, 0.08); box-shadow: var(--glow-blue); }
+    .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0; box-shadow: 0 0 10px currentColor;}
+    .dot-green{background:#3fb950; color: #3fb950; animation: pulse 2s infinite;}
+    .dot-gray{background:#484f58; color: #484f58;}
+
+    #toast{position:fixed;bottom:35px;right:35px;background: var(--card-bg); border:1px solid var(--border-color);
+           color: var(--text-main); padding:15px 28px;border-radius:15px;font-size:14px; font-weight: 800;
+           opacity:0;transition: all 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28); z-index:999; max-width:450px;
+           transform: translateY(130px); box-shadow: 0 30px 60px rgba(0,0,0,0.8); backdrop-filter: blur(20px);}
+    #toast.show{opacity:1; transform: translateY(0);}
+    #toast.toast-ok{border-left: 5px solid var(--accent-green); color: var(--accent-green)}
+    #toast.toast-err{border-left: 5px solid var(--accent-red); color: var(--accent-red)}
+    #toast.toast-warn{border-left: 5px solid var(--accent-yellow); color: var(--accent-yellow)}
+
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;
+                   align-items:center;justify-content:center; backdrop-filter: blur(12px);}
+    .modal-overlay.open{display:flex}
+    .modal{background: var(--card-bg); border:1px solid var(--border-color); border-radius:30px;
+           padding:35px;width:900px;max-width:95vw;max-height:92vh;overflow-y:auto; position: relative;
+           box-shadow: 0 40px 100px rgba(0,0,0,1); animation: modalIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); backdrop-filter: blur(25px);}
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.8) translateY(40px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .modal h3{color: var(--accent-blue); margin-bottom:20px;font-size:18px; border-bottom: 2px solid var(--border-color); padding-bottom: 15px; font-weight: 900;}
+    .modal-close{position: absolute; top: 25px; right: 25px; cursor:pointer;color: var(--text-sub);font-size:24px;line-height:1; transition: 0.3s;}
+    .modal-close:hover{color: var(--accent-red); transform: rotate(180deg) scale(1.2);}
+
+    /* Dashboard Fit-to-screen layout */
+    #tab-dashboard { gap: 20px; }
+    #tab-dashboard .grid-3 { margin-bottom: 0; }
+    #tab-dashboard .threshold-card { margin-bottom: 0; padding: 18px 24px; }
+    #tab-dashboard .trends-container { 
+      flex: 1; min-height: 300px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;
+    }
+    #tab-dashboard .trend-card { display: flex; flex-direction: column; height: 100%; min-height: 300px; }
+    #tab-dashboard .trend-card .chart-wrapper { flex: 1; min-height: 250px; position: relative; }
+
+    /* Auto-Optimization Styles */
+    .optimize-active { background: rgba(57, 208, 208, 0.15) !important; border-color: var(--accent-teal) !important; box-shadow: 0 0 20px rgba(57, 208, 208, 0.2); }
+    .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #21262d; transition: .4s; border-radius: 34px; border: 1px solid var(--border-color); }
+    .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--accent-teal); }
+    input:checked + .slider:before { transform: translateX(26px); }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="badge green pulse" style="animation-duration: 3s; flex-shrink: 0;">🛡️ SECURE NODE</div>
+  <div class="title-container">
+    <h1><span class="animated-icon pulse">🛡️</span> ProcGuard Dashboard <span class="sub">Monitor Smart. Control Fast. Stay Secure.</span></h1>
+  </div>
+  <div class="topbar-right">
+    <span id="clock" style="font-family: 'JetBrains Mono', monospace; font-weight: 900; font-size: 20px; color: var(--accent-blue); text-shadow: 0 0 15px rgba(88, 166, 255, 0.4);">--:--:-- --</span>
+    <span class="badge yellow bounce" style="flex-shrink: 0;">📡 LIVE STREAM</span>
+  </div>
+</div>
+
+<div id="alert-banner" class="hidden shake"></div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('dashboard')"><span class="animated-icon">📊</span> Dashboard</div>
+  <div class="tab" onclick="switchTab('processes')"><span class="animated-icon">⚙️</span> Processes</div>
+  <div class="tab" onclick="switchTab('logs')"><span class="animated-icon">📝</span> Logs</div>
+  <div class="tab" onclick="switchTab('reports')"><span class="animated-icon">📈</span> Reports</div>
+  <div class="tab" onclick="switchTab('dirs')"><span class="animated-icon">📁</span> Directories</div>
+  <div class="tab" onclick="switchTab('security')"><span class="animated-icon">🔒</span> Security</div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="tab-dashboard" class="tab-content active">
+  <div class="grid-4">
+    <div class="card" id="optimize-card">
+      <h3><span class="animated-icon rotate">🚀</span> Auto-Optimization</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 15px 0;">
+        <span class="stat-sub" id="optimize-status-text">STATUS: ACTIVE</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="optimize-toggle" checked onchange="toggleOptimize()">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="stat-sub" style="font-size: 12px; line-height: 1.4;">Automatically cleaning idle background tasks to boost performance.</div>
+    </div>
+    <div class="card">
+      <h3><span class="animated-icon pulse">⚡</span> CPU Usage</h3>
+      <div class="stat-val cpu-color" id="cpu-val">--</div>
+      <div class="stat-sub">Real-time processing load</div>
+      <div class="stat-bar"><div class="stat-bar-fill cpu-fill" id="cpu-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <h3><span class="animated-icon rotate">🧠</span> RAM Usage</h3>
+      <div class="stat-val ram-color" id="ram-val">--</div>
+      <div class="stat-sub" id="ram-sub">-- GB / -- GB</div>
+      <div class="stat-bar"><div class="stat-bar-fill ram-fill" id="ram-bar" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <h3><span class="animated-icon bounce">💾</span> Disk Usage</h3>
+      <div class="stat-val disk-color" id="disk-val">--</div>
+      <div class="stat-sub" id="disk-sub">-- GB / -- GB</div>
+      <div class="stat-bar"><div class="stat-bar-fill disk-fill" id="disk-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+  
+  <div class="grid-4" style="margin-top: 24px;">
+    <div class="card">
+      <h3><span class="animated-icon rotate">🔢</span> Active Processes</h3>
+      <div class="stat-val ram-color" id="total-procs-val">--</div>
+      <div class="stat-sub">Total system processes running</div>
+    </div>
+    <div class="card" style="grid-column: span 2;">
+      <h3><span class="animated-icon shake">🚨</span> Critical Threshold Monitor</h3>
+      <div class="grid-3" style="margin-bottom: 0; padding: 0;">
+        <div style="padding: 5px;">
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span class="stat-sub">CPU CORE</span>
+            <span class="badge" id="t-cpu-badge">OK</span>
+          </div>
+          <div class="stat-bar" style="margin-top:0"><div class="stat-bar-fill cpu-fill" id="t-cpu" style="width:0%"></div></div>
+          <div class="stat-sub" id="t-cpu-val" style="margin-top: 6px; text-align: right;">--%</div>
+        </div>
+        <div style="padding: 5px;">
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span class="stat-sub">MEMORY</span>
+            <span class="badge" id="t-ram-badge">OK</span>
+          </div>
+          <div class="stat-bar" style="margin-top:0"><div class="stat-bar-fill ram-fill" id="t-ram" style="width:0%"></div></div>
+          <div class="stat-sub" id="t-ram-val" style="margin-top: 6px; text-align: right;">--%</div>
+        </div>
+        <div style="padding: 5px;">
+          <div style="display:flex; justify-content: space-between; margin-bottom: 8px;">
+            <span class="stat-sub">STORAGE</span>
+            <span class="badge" id="t-disk-badge">OK</span>
+          </div>
+          <div class="stat-bar" style="margin-top:0"><div class="stat-bar-fill disk-fill" id="t-disk" style="width:0%"></div></div>
+          <div class="stat-sub" id="t-disk-val" style="margin-top: 6px; text-align: right;">--%</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3><span class="animated-icon pulse">🌐</span> Network Speed</h3>
+      <div class="stat-val cpu-color" id="net-val" style="font-size: 32px; letter-spacing: -1px;">
+        <span style="font-size: 14px; color: var(--text-sub); margin-right: 5px;">▼</span><span id="net-down">0</span>
+        <span style="font-size: 14px; color: var(--text-sub); margin: 0 5px;">▲</span><span id="net-up">0</span>
+      </div>
+      <div class="stat-sub">KB/s Real-time speed</div>
+      <div style="display: flex; gap: 4px; margin-top: 15px;">
+        <div style="flex: 1; height: 4px; background: #21262d; border-radius: 2px;"><div id="net-down-bar" style="height: 100%; width: 0%; background: var(--accent-blue); border-radius: 2px; transition: 0.5s;"></div></div>
+        <div style="flex: 1; height: 4px; background: #21262d; border-radius: 2px;"><div id="net-up-bar" style="height: 100%; width: 0%; background: var(--accent-green); border-radius: 2px; transition: 0.5s;"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="trends-container" style="margin-top: 24px;">
+    <div class="card trend-card">
+      <h3><span class="animated-icon pulse">📉</span> CPU Performance History</h3>
+      <div class="chart-wrapper">
+        <canvas id="cpuChart"></canvas>
+      </div>
+    </div>
+    <div class="card trend-card">
+      <h3><span class="animated-icon bounce">📈</span> Memory Allocation Trend</h3>
+      <div class="chart-wrapper">
+        <canvas id="ramChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PROCESSES ── -->
+<div id="tab-processes" class="tab-content">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <h3 style="margin:0"><span class="animated-icon rotate">⚙️</span> <span id="proc-title">System Process Manager</span> (<span id="total-procs-count">--</span>)</h3>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="display: flex; align-items: center; background: #21262d; border-radius: 8px; padding: 0 12px; border: 1px solid var(--border-color);">
+           <span style="font-size: 13px; color: var(--text-sub); margin-right: 8px;">KILL IF ></span>
+           <input type="number" id="autokill-thresh" value="50" min="1" max="100" style="width:60px; background: transparent; border: none; padding: 10px 0; font-weight: bold;"/>
+           <span style="font-size: 13px; color: var(--text-sub); margin-left: 4px;">%</span>
+        </div>
+        <button class="btn btn-orange" onclick="autoKill()"><span class="animated-icon">🤖</span> Auto-Kill</button>
+        <button class="btn btn-blue"   onclick="loadProcesses()"><span class="animated-icon rotate">⟳</span> Refresh</button>
+      </div>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead><tr><th>PID</th><th>Process Name</th><th>CPU %</th><th>Memory %</th><th>Status</th><th>User</th><th>Action</th></tr></thead>
+        <tbody id="proc-body"><tr><td colspan="7" style="text-align:center;color:var(--text-sub); padding: 40px;">🔍 Scanning system processes...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── LOGS ── -->
+<div id="tab-logs" class="tab-content">
+  <div class="card" style="margin-bottom: 20px;">
+    <h3><span class="animated-icon float">📝</span> Live System Event Stream</h3>
+    <div class="log-controls">
+      <div style="display: flex; gap: 8px;">
+        <select id="log-level">
+          <option value="ALL">All Levels</option>
+          <option value="INFO">INFO</option>
+          <option value="WARN">WARN</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+        <select id="log-lines">
+          <option value="50">Last 50</option>
+          <option value="100" selected>Last 100</option>
+          <option value="200">Last 200</option>
+        </select>
+      </div>
+      <button class="btn btn-blue"   onclick="loadLogs()"><span class="animated-icon rotate">⟳</span> Refresh</button>
+      <button class="btn btn-orange" onclick="rotateLogs()"><span class="animated-icon">🔄</span> Rotate Log</button>
+      <span id="log-count" style="font-size:13px;color:var(--text-sub);margin-left:auto; font-family: 'JetBrains Mono', monospace;"></span>
+    </div>
+    <div class="log-box" id="log-box">Initializing secure log viewer...</div>
+  </div>
+  <div class="card">
+    <h3><span class="animated-icon bounce">🗄️</span> Historical Security Archives</h3>
+    <div style="overflow-x:auto">
+      <table class="archive-table">
+        <thead><tr><th>Archive File</th><th>Size</th><th>Created</th><th>Action</th></tr></thead>
+        <tbody id="log-archive-body"><tr><td colspan="4" style="color:var(--text-sub); padding: 20px;">No archives available.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── REPORTS ── -->
+<div id="tab-reports" class="tab-content">
+  <div style="display:flex;gap:15px;margin-bottom:20px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-green" onclick="generateReport()"><span class="animated-icon">📊</span> Generate Intelligence Report</button>
+    <button class="btn btn-blue"  onclick="loadReport()"><span class="animated-icon rotate">⟳</span> Load Current</button>
+    <a href="/api/report/download" class="btn btn-teal" id="dl-current-btn">
+      <span class="animated-icon bounce">⬇️</span> Download Report
+    </a>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3><span class="animated-icon float">📄</span> Current Performance Summary</h3>
+      <div class="report-box" id="report-box">Generate a report to see data...</div>
+    </div>
+    <div class="card">
+      <h3><span class="animated-icon bounce">🗄️</span> Report Archive Storage</h3>
+      <div style="overflow-x:auto">
+        <table class="archive-table">
+          <thead>
+            <tr><th>Report File</th><th>Size</th><th>Created</th><th>Download</th></tr>
+          </thead>
+          <tbody id="rep-archive-body">
+            <tr><td colspan="4" style="color:var(--text-sub); padding: 20px;">No reports archived.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DIRECTORIES ── -->
+<div id="tab-dirs" class="tab-content">
+  <div class="grid-4" id="dir-grid"></div>
+  
+  <div class="card">
+    <h3><span class="animated-icon float">📊</span> Storage Health & Rotation</h3>
+    <div style="background: rgba(0,0,0,0.3); padding: 24px; border-radius: 12px;">
+      <div style="display:flex; justify-content: space-between; margin-bottom: 12px;">
+        <span class="stat-sub">Log File Capacity</span>
+        <span class="stat-sub" id="log-size-val" style="color: var(--accent-blue);">-- KB / -- KB</span>
+      </div>
+      <div class="stat-bar"><div class="stat-bar-fill" id="log-size-bar" style="width:0%;background: var(--accent-blue)"></div></div>
+      <div style="font-size:13px;color:var(--text-sub);margin-top:12px; display: flex; align-items: center; gap: 8px;">
+        <span class="animated-icon pulse">ℹ️</span> 
+        Auto-rotation triggers at 100% capacity to ensure system stability.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECURITY ── -->
+<div id="tab-security" class="tab-content">
+  <div class="grid-2">
+    <div class="card">
+      <h3><span class="animated-icon pulse">🛡️</span> Critical Process Protection List</h3>
+      <p style="font-size:13px;color:var(--text-sub);margin-bottom:20px; line-height: 1.6;">
+        The following processes are <strong style="color:var(--accent-red)">IMMUNE</strong> to termination. 
+        They are vital for system stability and cannot be killed via this interface.
+      </p>
+      <div class="crit-grid" id="crit-grid"></div>
+    </div>
+    <div class="card">
+      <h3><span class="animated-icon rotate">⚙️</span> Enforcement Thresholds</h3>
+      <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px;">
+        <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #21262d">
+          <span class="stat-sub">CPU Max Limit</span><span class="badge yellow">{{ cpu_threshold }}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #21262d">
+          <span class="stat-sub">Memory Max Limit</span><span class="badge yellow">{{ mem_threshold }}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #21262d">
+          <span class="stat-sub">Disk Alert Limit</span><span class="badge yellow">{{ disk_threshold }}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #21262d">
+          <span class="stat-sub">Log Size Cap</span><span class="badge green">1 MB</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0;">
+          <span class="stat-sub">Auto-Kill Status</span><span class="badge green">ACTIVE</span>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h3><span class="animated-icon shake">🔪</span> Recent Termination Activity</h3>
+      <div class="log-box" id="kill-history-box" style="height:250px">Scanning logs for kill events...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal ── -->
+<div class="modal-overlay" id="archive-modal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal()">✕</span>
+    <h3 id="modal-title">Archive Viewer</h3>
+    <div class="log-box" id="modal-content" style="height:500px;margin-top:15px"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Charts ───────────────────────────────────────────────────────────────────
+const MAX_POINTS = 50; 
+const chartOpts = (label, color) => ({
+  type:'line',
+  data:{labels:[],datasets:[{label,data:[],borderColor:color,backgroundColor:color+'11',
+        borderWidth:4,pointRadius:0,pointHoverRadius:8,tension:.4,fill:true}]},
+  options:{
+    animation:{duration:600},responsive:true, maintainAspectRatio: false,
+    scales:{
+      x:{display: false},
+      y:{min:0,max:100,ticks:{color:'#8b949e',font:{size:12, weight: 'bold'}},grid:{color:'#21262d', drawBorder: false}}
+    },
+    plugins:{
+      legend:{display: false}, 
+      tooltip: {
+        mode: 'index', 
+        intersect: false,
+        backgroundColor: 'rgba(22, 27, 34, 0.95)',
+        titleColor: '#58a6ff',
+        bodyColor: '#e6edf3',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        padding: 12,
+        displayColors: false,
+        titleFont: {size: 14, weight: 'bold'},
+        bodyFont: {size: 13}
+      }
+    }
+  }
+});
+const cpuChart = new Chart(document.getElementById('cpuChart'), chartOpts('CPU %','#58a6ff'));
+const ramChart = new Chart(document.getElementById('ramChart'), chartOpts('RAM %','#3fb950'));
+
+function pushChart(chart, val) {
+  const now = new Date().toLocaleTimeString('en-GB');
+  chart.data.labels.push(now);
+  chart.data.datasets[0].data.push(val);
+  if (chart.data.labels.length > MAX_POINTS) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+  chart.update('none');
+}
+
+// ── Clock ────────────────────────────────────────────────────────────────────
+setInterval(() => { 
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' }); 
+}, 1000);
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg; t.className = `show toast-${type}`;
+  setTimeout(() => t.className = '', 4000);
+}
+
+// ── Tab Switch ───────────────────────────────────────────────────────────────
+let currentTab = 'dashboard';
+let processesFullMode = false;
+
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  
+  const tabs = document.querySelectorAll('.tab');
+  for(let t of tabs) {
+    if(t.textContent.toLowerCase().includes(name)) t.classList.add('active');
+  }
+  
+  if (name==='processes') loadProcesses();
+  if (name==='logs')      { loadLogs(); loadLogArchives(); }
+  if (name==='reports')   { loadReport(); loadRepArchives(); }
+  if (name==='dirs')      loadDirs();
+  if (name==='security')  { loadCritical(); loadKillHistory(); }
+}
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+let seenEvents = new Set();
+
+async function fetchStats() {
+  try {
+    const r = await fetch('/api/stats'); const d = await r.json();
+    const cpuPct = d.cpu.toFixed(1);
+    document.getElementById('cpu-val').innerHTML = `${cpuPct}<span style="font-size:24px; opacity: 0.6;">%</span>`;
+    document.getElementById('cpu-bar').style.width = cpuPct+'%';
+    pushChart(cpuChart, d.cpu);
+    
+    const ramPct = d.ram.percent.toFixed(1);
+    document.getElementById('ram-val').innerHTML = `${ramPct}<span style="font-size:24px; opacity: 0.6;">%</span>`;
+    document.getElementById('ram-sub').textContent = `${d.ram.used_gb} GB / ${d.ram.total_gb} GB`;
+    document.getElementById('ram-bar').style.width = ramPct+'%';
+    pushChart(ramChart, d.ram.percent);
+    
+    const diskPct = d.disk.percent.toFixed(1);
+    document.getElementById('disk-val').innerHTML = `${diskPct}<span style="font-size:24px; opacity: 0.6;">%</span>`;
+    document.getElementById('disk-sub').textContent = `${d.disk.used_gb} GB / ${d.disk.total_gb} GB`;
+    document.getElementById('disk-bar').style.width = diskPct+'%';
+
+    // Network Speed
+    document.getElementById('net-down').textContent = d.net.down;
+    document.getElementById('net-up').textContent = d.net.up;
+    document.getElementById('net-down-bar').style.width = Math.min(d.net.down / 10, 100) + '%';
+    document.getElementById('net-up-bar').style.width = Math.min(d.net.up / 10, 100) + '%';
+
+    // Total Procs
+    document.getElementById('total-procs-val').textContent = d.total_procs;
+    document.getElementById('total-procs-count').textContent = d.total_procs;
+    
+    setThresh('cpu',  d.cpu,          d.thresholds.cpu);
+    setThresh('ram',  d.ram.percent,  d.thresholds.mem);
+    setThresh('disk', d.disk.percent, d.thresholds.disk);
+    
+    // Auto-Optimization UI
+    const optCard = document.getElementById('optimize-card');
+    const optToggle = document.getElementById('optimize-toggle');
+    const optText = document.getElementById('optimize-status-text');
+    
+    if (optCard && d.auto_optimize !== undefined) {
+      if (d.auto_optimize) {
+        optCard.classList.add('optimize-active');
+        optText.textContent = 'STATUS: ACTIVE';
+        optToggle.checked = true;
+      } else {
+        optCard.classList.remove('optimize-active');
+        optText.textContent = 'STATUS: PAUSED';
+        optToggle.checked = false;
+      }
+    }
+    
+    const banner = document.getElementById('alert-banner');
+    if (d.alerts.length > 0) { 
+      banner.classList.remove('hidden'); 
+      banner.innerHTML = '⚠️ <strong>CRITICAL SECURITY ALERT:</strong> ' + d.alerts.map(a => `<span style="margin:0 12px">${a}</span>`).join(' | '); 
+    }
+    else banner.classList.add('hidden');
+
+    // Handle Watcher Events
+    if (d.watcher_events && d.watcher_events.length > 0) {
+      d.watcher_events.forEach(ev => {
+        const eventId = `${ev.name}-${ev.pid}-${ev.time}`;
+        if (!seenEvents.has(eventId)) {
+          toast(`🚀 [WATCHER] ${ev.name} detected (PID ${ev.pid})`, 'warn');
+          seenEvents.add(eventId);
+          // Keep set size manageable
+          if (seenEvents.size > 50) {
+            const firstItem = seenEvents.values().next().value;
+            seenEvents.delete(firstItem);
+          }
+          // If on security tab, refresh kill history
+          if (currentTab === 'security') loadKillHistory();
+        }
+      });
+    }
+
+    // Auto-refresh processes if on that tab
+    if (currentTab === 'processes') {
+        loadProcesses();
+    }
+  } catch(e) { console.error(e); }
+}
+
+function setThresh(id, val, thresh) {
+  const bar = document.getElementById(`t-${id}`);
+  if (!bar) return;
+  bar.style.width = val+'%';
+  document.getElementById(`t-${id}-val`).textContent = val.toFixed(1)+'%';
+  const b = document.getElementById(`t-${id}-badge`);
+  if (val >= thresh)           { b.textContent='⚠ ALERT'; b.className='badge red'; }
+  else if (val >= thresh*0.85) { b.textContent='! WARN';  b.className='badge yellow'; }
+  else                         { b.textContent='✓ OK';    b.className='badge green'; }
+}
+
+// ── Processes ────────────────────────────────────────────────────────────────
+async function loadProcesses() {
+  const r = await fetch(`/api/processes?all=true`); 
+  const data = await r.json();
+  const procs = data.processes;
+  document.getElementById('proc-title').textContent = 'All Active System Processes';
+  document.getElementById('proc-body').innerHTML = procs.map(p => {
+    const isHighCpu = p.cpu_percent >= 50;
+    const isHighMem = p.memory_percent >= 50;
+    
+    const rowCls = isHighCpu || isHighMem ? 'high-usage-row' : '';
+    const cpuCls = isHighCpu ? 'high-cpu-text' : '';
+    const memCls = isHighMem ? 'warn-color' : '';
+    const stCls  = p.status==='running'?'s-running':p.status==='sleeping'?'s-sleeping':p.status==='zombie'?'s-zombie':'s-other';
+    
+    const action = p.protected
+      ? `<span class="protected-badge">🛡️ Protected</span>`
+      : `<button class="btn-kill" onclick="killPid(${p.pid},this)">🔪 Kill</button>`;
+      
+    return `<tr class="${rowCls}">
+      <td style="font-family: 'JetBrains Mono', monospace; font-weight: 900; color: var(--text-sub);">${p.pid}</td>
+      <td style="color:${p.protected?'var(--accent-red)':'var(--accent-blue)'}; font-weight: 800;">${p.name}</td>
+      <td class="${cpuCls}" style="font-weight: 900;">${(p.cpu_percent||0).toFixed(1)}%</td>
+      <td class="${memCls}" style="font-weight: 900;">${(p.memory_percent||0).toFixed(1)}%</td>
+      <td><span class="status-pill ${stCls}">${p.status}</span></td>
+      <td style="color:var(--text-sub); font-weight: 600;">${p.username||'-'}</td>
+      <td>${action}</td></tr>`;
+  }).join('');
+}
+
+async function killPid(pid, btn) {
+  if (!confirm(`Are you sure you want to terminate PID ${pid}?`)) return;
+  btn.disabled=true; btn.textContent='...';
+  const r = await fetch('/api/kill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pid})});
+  const d = await r.json();
+  if      (d.status==='killed')      { toast(`✅ Success: PID ${pid} (${d.name}) terminated.`,'ok'); loadProcesses(); }
+  else if (d.status==='sudo_killed') { toast(`🔐 Security: PID ${pid} terminated via elevated sudo.`,'warn'); loadProcesses(); }
+  else if (d.status==='blocked')     { toast(`🛡️ Blocked: ${d.reason}`,'err'); btn.disabled=false; btn.textContent='🔪 Kill'; }
+  else                               { toast(`❌ Error: ${d.reason}`,'err'); btn.disabled=false; btn.textContent='🔪 Kill'; }
+}
+
+async function autoKill() {
+  const thresh = document.getElementById('autokill-thresh').value;
+  if (!confirm(`Auto-kill all non-critical processes using more than ${thresh}% resources?`)) return;
+  const r = await fetch('/api/autokill',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({threshold:thresh})});
+  const d = await r.json();
+  toast(`🤖 Auto-Kill: ${d.killed.length} process(es) terminated.`, d.killed.length>0?'warn':'ok');
+  loadProcesses();
+}
+
+// ── Logs ─────────────────────────────────────────────────────────────────────
+async function loadLogs() {
+  const level = document.getElementById('log-level').value;
+  const n     = document.getElementById('log-lines').value;
+  const r = await fetch(`/api/logs?level=${level}&n=${n}`); const d = await r.json();
+  document.getElementById('log-count').textContent = `Tracking ${d.count} events`;
+  const box = document.getElementById('log-box');
+  box.innerHTML = d.lines.length
+    ? d.lines.map(l => {
+        const cls = l.includes('[WARN]')||l.includes('[ WARN]')?'log-WARN':l.includes('[ERROR]')?'log-ERROR':'log-INFO';
+        return `<div class="${cls}">${escHtml(l)}</div>`;
+      }).join('')
+    : '<div style="color:var(--text-sub); text-align: center; padding-top: 50px;">No matching log entries found.</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+async function rotateLogs() {
+  const r = await fetch('/api/logs/rotate',{method:'POST'}); const d = await r.json();
+  if (d.status==='rotated') { 
+    toast(`🔄 Log Rotation Successful → ${d.archive}`,'ok'); 
+    loadLogs(); loadLogArchives(); loadDirs(); 
+  }
+  else toast(`ℹ️ ${d.reason}`,'warn');
+}
+
+async function loadLogArchives() {
+  const r = await fetch('/api/logs/archives'); const files = await r.json();
+  document.getElementById('log-archive-body').innerHTML = files.length
+    ? files.map(f => `<tr>
+        <td><span style="color: var(--accent-blue)">📄</span> <strong>${f.name}</strong></td>
+        <td>${f.size_kb} KB</td>
+        <td>${f.modified}</td>
+        <td><button class="btn-view" onclick="viewArchive('log','${f.name}')">👁 View</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="color:var(--text-sub); text-align: center;">No archives available in storage.</td></tr>';
+}
+
+// ── Reports ──────────────────────────────────────────────────────────────────
+async function loadReport() {
+  const r = await fetch('/api/report/current'); const d = await r.json();
+  document.getElementById('report-box').textContent = d.report;
+}
+
+async function generateReport() {
+  toast('⏳ Compiling performance intelligence report...','warn');
+  const r = await fetch('/api/report/generate',{method:'POST'}); const d = await r.json();
+  document.getElementById('report-box').textContent = d.report;
+  toast('✅ Intelligence report generated successfully!','ok');
+  loadRepArchives();
+}
+
+async function loadRepArchives() {
+  const r = await fetch('/api/report/archives'); const files = await r.json();
+  document.getElementById('rep-archive-body').innerHTML = files.length
+    ? files.map(f => `<tr>
+        <td><span style="color: var(--accent-teal)">📊</span> <strong>${f.name}</strong></td>
+        <td>${f.size_kb} KB</td>
+        <td>${f.modified}</td>
+        <td>
+          <a href="/api/report/archive/download/${f.name}" class="btn-dl" download="${f.name}" style="background:rgba(57, 208, 208, 0.15); color: #39d0d0; border: 2px solid #39d0d0; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 900;">⬇️ Download</a>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="color:var(--text-sub); text-align: center;">No historical reports found.</td></tr>';
+}
+
+// ── Directories ──────────────────────────────────────────────────────────────
+async function loadDirs() {
+  const r = await fetch('/api/dirs'); const d = await r.json();
+  const dirs = [
+    {label:'📂 system/logs/',         info:d.logs,         color: 'var(--accent-blue)'},
+    {label:'🗄️ logs/archive/',      info:d.logs_archive, color: 'var(--text-sub)'},
+    {label:'📊 reports/',           info:d.reports,      color: 'var(--accent-green)'},
+    {label:'🗄️ reports/archive/',   info:d.rep_archive,  color: 'var(--text-sub)'},
+  ];
+  document.getElementById('dir-grid').innerHTML = dirs.map(({label,info,color}) => `
+    <div class="card">
+      <h3 style="color:${color}">${label}</h3>
+      <div style="background: rgba(0,0,0,0.25); padding: 18px; border-radius: 12px;">
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #21262d">
+          <span class="stat-sub">ACTIVE</span><span class="badge ${info.exists?'green':'red'}">${info.exists?'ONLINE':'OFFLINE'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #21262d">
+          <span class="stat-sub">ENTRIES</span><span style="color:${color}; font-weight: 900;">${info.files}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;">
+          <span class="stat-sub">VOLUME</span><span style="color:${color}; font-weight: 900;">${info.size_kb} KB</span>
+        </div>
+      </div>
+    </div>`).join('');
+  
+  const pct = Math.min(d.log_pct, 100);
+  const sbar = document.getElementById('log-size-bar');
+  sbar.style.width = pct+'%';
+  sbar.style.background = pct>90?'var(--accent-red)':pct>70?'var(--accent-yellow)':'var(--accent-blue)';
+  document.getElementById('log-size-val').textContent = `${d.log_size_kb} KB / ${d.log_max_kb} KB (${d.log_pct}%)`;
+}
+
+// ── Security ─────────────────────────────────────────────────────────────────
+async function loadCritical() {
+  const r = await fetch('/api/critical'); const list = await r.json();
+  document.getElementById('crit-grid').innerHTML = list.map(p => `
+    <div class="crit-item">
+      <div class="dot ${p.running?'dot-green':'dot-gray'}"></div>
+      <span style="color:${p.running?'var(--accent-green)':'var(--text-main)'}; font-weight: 800; letter-spacing: 0.5px;">${p.name}</span>
+    </div>`).join('');
+}
+
+async function loadKillHistory() {
+  const r = await fetch('/api/logs?level=ALL&n=200'); const d = await r.json();
+  const kills = d.lines.filter(l => l.includes('KILL')||l.includes('blocked')||l.includes('SUDO')||l.includes('terminate'));
+  const box = document.getElementById('kill-history-box');
+  box.innerHTML = kills.length
+    ? kills.map(l => {
+        const cls = l.includes('ERROR')||l.includes('blocked')?'log-ERROR':l.includes('WARN')||l.includes('SUDO')?'log-WARN':'log-INFO';
+        return `<div class="${cls}" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 0; margin-bottom: 5px;">${escHtml(l)}</div>`;
+      }).join('')
+    : '<div style="color:var(--text-sub); text-align: center; padding-top: 40px;">No termination events recorded in current log stream.</div>';
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── Archive Modal ─────────────────────────────────────────────────────────────
+async function viewArchive(type, filename) {
+  document.getElementById('archive-modal').classList.add('open');
+  document.getElementById('modal-title').textContent = `SECURITY ARCHIVE: ${filename}`;
+  document.getElementById('modal-content').innerHTML = '<div style="text-align:center; padding: 60px;">🔐 Accessing encrypted archive...</div>';
+  const r = await fetch(`/api/logs/archive/${filename}`); const d = await r.json();
+  const box = document.getElementById('modal-content');
+  box.innerHTML = (d.lines||[]).map(l => {
+    const cls = l.includes('[WARN]')?'log-WARN':l.includes('[ERROR]')?'log-ERROR':'log-INFO';
+    return `<div class="${cls}">${escHtml(l)}</div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+function closeModal() { document.getElementById('archive-modal').classList.remove('open'); }
+
+async function toggleOptimize() {
+  const r = await fetch('/api/optimize/toggle', {method:'POST'});
+  const d = await r.json();
+  toast(`🚀 Auto-Optimization ${d.enabled?'ENABLED':'DISABLED'}`, d.enabled?'ok':'warn');
+  fetchStats();
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+fetchStats();
+setInterval(fetchStats, 1000);
+</script>
+</body>
+</html>

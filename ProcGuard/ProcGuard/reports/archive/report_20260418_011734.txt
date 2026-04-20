@@ -1,0 +1,17 @@
+ProcGuard Performance Report
+Generated : 2026-04-18 01:17:33
+---------------------------------------------
+System Uptime     : 6 days, 0:18:26
+Avg CPU Usage     : 47.6%
+Avg Mem Usage     : 92.3%  (15.22 GB / 16.48 GB)
+Disk Status       : 123.7 GB / 343.2 GB  (38.0% used)
+---------------------------------------------
+Top 5 CPU Processes:
+  PID  466101  brave                     CPU 103.9%
+  PID  289259  brave                     CPU 76.9%
+  PID  438336  code                      CPU 28.0%
+  PID  464322  brave                     CPU 26.3%
+  PID  379319  brave                     CPU 26.2%
+---------------------------------------------
+Total Alerts (WARN) in log : 0
+---------------------------------------------

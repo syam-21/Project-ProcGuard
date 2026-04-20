@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🛡️ ProcGuard Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; }
+    header {
+      background: linear-gradient(135deg, #161b22, #1f2937);
+      padding: 20px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #30363d;
+    }
+    header h1 { font-size: 1.8rem; color: #58a6ff; }
+    header span { font-size: 0.9rem; color: #8b949e; }
+    #clock { font-size: 1rem; color: #3fb950; font-weight: bold; }
+    .alert-box {
+      background: #2d1b1b; border-left: 4px solid #f85149;
+      padding: 10px 20px; margin: 10px 20px; border-radius: 6px; display: none;
+    }
+    .alert-box p { color: #f85149; font-weight: bold; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding: 20px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; }
+    .card h3 { color: #8b949e; font-size: 0.85rem; margin-bottom: 10px; text-transform: uppercase; }
+    .card .value { font-size: 2.5rem; font-weight: bold; }
+    .card .sub { font-size: 0.8rem; color: #8b949e; margin-top: 5px; }
+    .progress-bar { background: #21262d; border-radius: 20px; height: 10px; margin-top: 10px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 20px; transition: width 0.5s ease; }
+    .cpu-color { background: linear-gradient(90deg, #58a6ff, #1f6feb); }
+    .ram-color { background: linear-gradient(90deg, #3fb950, #238636); }
+    .disk-color { background: linear-gradient(90deg, #d29922, #9e6a03); }
+    .cpu-val { color: #58a6ff; } .ram-val { color: #3fb950; } .disk-val { color: #d29922; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 20px 20px; }
+    .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; }
+    .chart-card h3 { color: #8b949e; margin-bottom: 15px; font-size: 0.9rem; text-transform: uppercase; }
+    .table-section { padding: 0 20px 30px; }
+    .table-section h2 { color: #c9d1d9; margin-bottom: 15px; font-size: 1.1rem; }
+    table { width: 100%; border-collapse: collapse; background: #161b22; border-radius: 12px; overflow: hidden; border: 1px solid #30363d; }
+    thead { background: #21262d; }
+    th { padding: 12px 16px; text-align: left; font-size: 0.8rem; color: #8b949e; text-transform: uppercase; }
+    td { padding: 10px 16px; font-size: 0.85rem; border-top: 1px solid #21262d; }
+    tr:hover { background: #1c2128; }
+    .badge { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
+    .badge-green { background: #1a3a2a; color: #3fb950; }
+    .badge-red { background: #3a1a1a; color: #f85149; }
+    .badge-yellow { background: #3a2a1a; color: #d29922; }
+    .kill-btn {
+      background: #2d1b1b; color: #f85149; border: 1px solid #f85149;
+      padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
+    }
+    .kill-btn:hover { background: #f85149; color: white; }
+    .toast {
+      position: fixed; bottom: 30px; right: 30px; background: #238636;
+      color: white; padding: 12px 24px; border-radius: 8px;
+      font-weight: bold; display: none; z-index: 999;
+    }
+    .refresh-badge { background: #1a3a2a; color: #3fb950; padding: 5px 14px; border-radius: 20px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🛡️ ProcGuard Dashboard</h1>
+    <span>System Process Monitor — Real-Time</span>
+  </div>
+  <div style="text-align:right">
+    <div id="clock">Loading...</div>
+    <div class="refresh-badge" style="margin-top:6px">🔄 Auto Refresh: 3s</div>
+  </div>
+</header>
+
+<div class="alert-box" id="alertBox">
+  <p id="alertText">⚠️ Alert!</p>
+</div>
+
+<div class="grid-3">
+  <div class="card">
+    <h3>⚡ CPU Usage</h3>
+    <div class="value cpu-val" id="cpuVal">0%</div>
+    <div class="sub" id="cpuSub">Calculating...</div>
+    <div class="progress-bar"><div class="progress-fill cpu-color" id="cpuBar" style="width:0%"></div></div>
+  </div>
+  <div class="card">
+    <h3>🧠 RAM Usage</h3>
+    <div class="value ram-val" id="ramVal">0%</div>
+    <div class="sub" id="ramSub">Calculating...</div>
+    <div class="progress-bar"><div class="progress-fill ram-color" id="ramBar" style="width:0%"></div></div>
+  </div>
+  <div class="card">
+    <h3>💾 Disk Usage</h3>
+    <div class="value disk-val" id="diskVal">0%</div>
+    <div class="sub" id="diskSub">Calculating...</div>
+    <div class="progress-bar"><div class="progress-fill disk-color" id="diskBar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>📈 CPU History</h3>
+    <canvas id="cpuChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>📈 RAM History</h3>
+    <canvas id="ramChart"></canvas>
+  </div>
+</div>
+
+<div class="table-section">
+  <h2>🔍 Top 20 Processes (by Memory)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>PID</th><th>Process Name</th><th>CPU %</th>
+        <th>Memory %</th><th>Status</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="processTable">
+      <tr><td colspan="6" style="text-align:center;color:#8b949e">Loading...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const cpuCtx = document.getElementById("cpuChart").getContext("2d");
+  const ramCtx = document.getElementById("ramChart").getContext("2d");
+
+  const chartConfig = (label, color) => ({
+    type: "line",
+    data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color+"22", borderWidth: 2, fill: true, tension: 0.4, pointRadius: 3 }] },
+    options: {
+      responsive: true,
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: "#8b949e" }, grid: { color: "#21262d" } },
+        x: { ticks: { color: "#8b949e" }, grid: { color: "#21262d" } }
+      },
+      plugins: { legend: { labels: { color: "#c9d1d9" } } }
+    }
+  });
+
+  const cpuChart = new Chart(cpuCtx, chartConfig("CPU %", "#58a6ff"));
+  const ramChart = new Chart(ramCtx, chartConfig("RAM %", "#3fb950"));
+
+  function showToast(msg, success=true) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.background = success ? "#238636" : "#b91c1c";
+    t.style.display = "block";
+    setTimeout(() => t.style.display = "none", 3000);
+  }
+
+  function killProcess(pid, name) {
+    if (!confirm(`Kill process: ${name} (PID: ${pid})?`)) return;
+    fetch("/api/kill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pid })
+    }).then(r => r.json()).then(d => showToast(d.success ? "✅ "+d.message : "❌ "+d.message, d.success));
+  }
+
+  function getStatusBadge(status) {
+    if (status === "running") return `<span class="badge badge-green">running</span>`;
+    if (status === "sleeping") return `<span class="badge badge-yellow">sleeping</span>`;
+    return `<span class="badge badge-red">${status}</span>`;
+  }
+
+  function fetchStats() {
+    fetch("/api/stats").then(r => r.json()).then(d => {
+      document.getElementById("clock").textContent = "🕐 " + d.time;
+      document.getElementById("cpuVal").textContent = d.cpu + "%";
+      document.getElementById("cpuSub").textContent = "Core Usage";
+      document.getElementById("cpuBar").style.width = d.cpu + "%";
+      document.getElementById("ramVal").textContent = d.ram + "%";
+      document.getElementById("ramSub").textContent = d.ram_used + " GB / " + d.ram_total + " GB";
+      document.getElementById("ramBar").style.width = d.ram + "%";
+      document.getElementById("diskVal").textContent = d.disk + "%";
+      document.getElementById("diskSub").textContent = d.disk_used + " GB / " + d.disk_total + " GB";
+      document.getElementById("diskBar").style.width = d.disk + "%";
+
+      cpuChart.data.labels = d.time_history;
+      cpuChart.data.datasets[0].data = d.cpu_history;
+      cpuChart.update();
+      ramChart.data.labels = d.time_history;
+      ramChart.data.datasets[0].data = d.ram_history;
+      ramChart.update();
+
+      const alertBox = document.getElementById("alertBox");
+      if (d.alerts.length > 0) {
+        alertBox.style.display = "block";
+        document.getElementById("alertText").textContent = "⚠️ " + d.alerts.join(" | ");
+      } else { alertBox.style.display = "none"; }
+
+      document.getElementById("processTable").innerHTML = d.processes.map(p => `
+        <tr>
+          <td>${p.pid}</td>
+          <td>${p.name}</td>
+          <td style="color:${p.cpu>50?"#f85149":"#c9d1d9"}">${p.cpu}%</td>
+          <td style="color:${p.mem>10?"#d29922":"#c9d1d9"}">${p.mem}%</td>
+          <td>${getStatusBadge(p.status)}</td>
+          <td><button class="kill-btn" onclick="killProcess(${p.pid},'${p.name}')">⛔ Kill</button></td>
+        </tr>`).join("");
+    });
+  }
+
+  fetchStats();
+  setInterval(fetchStats, 3000);
+</script>
+</body>
+</html>
+
